@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BCST Wholesale Credit Risk — Stress Testing Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0c10;
+    --surface: #11141a;
+    --surface2: #181c24;
+    --border: #1f2530;
+    --accent: #e8b84b;
+    --accent2: #4bade8;
+    --danger: #e85b4b;
+    --warn: #e8914b;
+    --ok: #4be88a;
+    --text: #d4dae6;
+    --text2: #7a8494;
+    --text3: #4a5260;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    font-family: var(--sans);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* GRID NOISE TEXTURE */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* TOP BAR */
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 28px;
+    height: 56px;
+    background: rgba(10,12,16,0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .logo-badge {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    color: var(--bg);
+    background: var(--accent);
+    padding: 3px 8px;
+    border-radius: 2px;
+  }
+
+  .topbar-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text2);
+    letter-spacing: 0.04em;
+  }
+
+  .topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text2);
+  }
+
+  .status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--ok);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .topbar-date {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text3);
+  }
+
+  /* SCENARIO SELECTOR BAR */
+  .scenario-bar {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 0 28px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+  }
+
+  .scenario-tab {
+    position: relative;
+    padding: 12px 20px;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    color: var(--text2);
+    cursor: pointer;
+    white-space: nowrap;
+    border: none;
+    background: none;
+    transition: color 0.2s;
+    font-family: var(--sans);
+  }
+
+  .scenario-tab:hover { color: var(--text); }
+
+  .scenario-tab.active {
+    color: var(--accent);
+  }
+
+  .scenario-tab.active::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--accent);
+  }
+
+  .scenario-tab .severity {
+    display: inline-block;
+    margin-left: 6px;
+    font-size: 9px;
+    font-family: var(--mono);
+    padding: 1px 5px;
+    border-radius: 2px;
+  }
+
+  .sev-severe { background: rgba(232,91,75,0.15); color: var(--danger); }
+  .sev-moderate { background: rgba(232,145,75,0.15); color: var(--warn); }
+  .sev-mild { background: rgba(75,232,138,0.15); color: var(--ok); }
+
+  /* MAIN LAYOUT */
+  .main {
+    position: relative;
+    z-index: 1;
+    padding: 24px 28px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: auto;
+    gap: 16px;
+  }
+
+  /* CARDS */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+    animation: fadeUp 0.5s ease both;
+  }
+
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--border);
+  }
+
+  .card.accent-top::before { background: var(--accent); }
+  .card.danger-top::before { background: var(--danger); }
+  .card.blue-top::before { background: var(--accent2); }
+  .card.ok-top::before { background: var(--ok); }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .card:nth-child(1) { animation-delay: 0.05s; }
+  .card:nth-child(2) { animation-delay: 0.1s; }
+  .card:nth-child(3) { animation-delay: 0.15s; }
+  .card:nth-child(4) { animation-delay: 0.2s; }
+  .card:nth-child(5) { animation-delay: 0.25s; }
+  .card:nth-child(6) { animation-delay: 0.3s; }
+  .card:nth-child(7) { animation-delay: 0.35s; }
+  .card:nth-child(8) { animation-delay: 0.4s; }
+
+  .card-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: var(--text3);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  .card-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text2);
+    margin-bottom: 16px;
+    letter-spacing: 0.02em;
+  }
+
+  /* SPAN CLASSES */
+  .span-2 { grid-column: span 2; }
+  .span-3 { grid-column: span 3; }
+
+  /* KPI METRICS ROW */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    grid-column: span 3;
+  }
+
+  .kpi-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 18px 20px;
+    position: relative;
+    overflow: hidden;
+    animation: fadeUp 0.5s ease both;
+  }
+
+  .kpi-card::after {
+    content: '';
+    position: absolute;
+    bottom: 0; right: 0;
+    width: 60px; height: 60px;
+    border-radius: 50%;
+    opacity: 0.05;
+  }
+
+  .kpi-card.k1::after { background: var(--danger); }
+  .kpi-card.k2::after { background: var(--warn); }
+  .kpi-card.k3::after { background: var(--accent2); }
+  .kpi-card.k4::after { background: var(--accent); }
+
+  .kpi-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: var(--text3);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .kpi-value {
+    font-family: var(--mono);
+    font-size: 28px;
+    font-weight: 600;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+
+  .kpi-value.red { color: var(--danger); }
+  .kpi-value.orange { color: var(--warn); }
+  .kpi-value.blue { color: var(--accent2); }
+  .kpi-value.gold { color: var(--accent); }
+
+  .kpi-sub {
+    font-size: 11px;
+    color: var(--text3);
+  }
+
+  .kpi-delta {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 2px;
+    margin-left: 6px;
+  }
+
+  .delta-up { background: rgba(232,91,75,0.12); color: var(--danger); }
+  .delta-dn { background: rgba(75,232,138,0.12); color: var(--ok); }
+
+  /* EXPOSURE TABLE */
+  .exposure-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+
+  .exposure-table th {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    color: var(--text3);
+    text-transform: uppercase;
+    text-align: left;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .exposure-table td {
+    padding: 9px 10px;
+    border-bottom: 1px solid rgba(31,37,48,0.6);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+
+  .exposure-table tr:last-child td { border-bottom: none; }
+  .exposure-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+  .rating-badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 2px;
+    font-size: 10px;
+    font-weight: 600;
+    font-family: var(--mono);
+  }
+
+  .r-aaa { background: rgba(75,232,138,0.12); color: var(--ok); }
+  .r-aa  { background: rgba(75,173,232,0.12); color: var(--accent2); }
+  .r-a   { background: rgba(232,184,75,0.12); color: var(--accent); }
+  .r-bbb { background: rgba(232,145,75,0.12); color: var(--warn); }
+  .r-bb  { background: rgba(232,91,75,0.12); color: var(--danger); }
+  .r-b   { background: rgba(180,60,50,0.2); color: #f07060; }
+
+  .bar-cell { min-width: 100px; }
+  .mini-bar {
+    height: 5px;
+    border-radius: 2px;
+    background: var(--border);
+    margin-top: 4px;
+    overflow: hidden;
+  }
+  .mini-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 1s ease;
+  }
+
+  /* WATERFALL CHART */
+  .waterfall-wrap {
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+    height: 140px;
+    padding-bottom: 20px;
+    position: relative;
+    margin-top: 8px;
+  }
+
+  .waterfall-wrap::before {
+    content: '';
+    position: absolute;
+    bottom: 20px;
+    left: 0; right: 0;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .wf-bar-group {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    position: relative;
+  }
+
+  .wf-bar {
+    width: 100%;
+    border-radius: 2px 2px 0 0;
+    transition: height 1s ease;
+    cursor: pointer;
+    position: relative;
+  }
+
+  .wf-bar:hover { filter: brightness(1.2); }
+
+  .wf-bar-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text3);
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+    position: absolute;
+    bottom: -18px;
+  }
+
+  .wf-bar-val {
+    position: absolute;
+    top: -16px;
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text2);
+    white-space: nowrap;
+  }
+
+  /* HEATMAP */
+  .heatmap-grid {
+    display: grid;
+    grid-template-columns: auto repeat(6, 1fr);
+    gap: 3px;
+    font-family: var(--mono);
+    font-size: 10px;
+    margin-top: 8px;
+  }
+
+  .hm-col-label {
+    text-align: center;
+    color: var(--text3);
+    padding: 4px 2px;
+    font-size: 9px;
+  }
+
+  .hm-row-label {
+    color: var(--text3);
+    padding: 4px 8px 4px 0;
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+    font-size: 10px;
+  }
+
+  .hm-cell {
+    aspect-ratio: 1;
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    font-weight: 600;
+    cursor: default;
+    transition: transform 0.15s;
+  }
+
+  .hm-cell:hover { transform: scale(1.1); z-index: 10; }
+
+  /* PD MIGRATION TABLE */
+  .migration-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--mono);
+    font-size: 11px;
+    margin-top: 8px;
+  }
+
+  .migration-table th {
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    color: var(--text3);
+    text-transform: uppercase;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+    text-align: center;
+  }
+
+  .migration-table td {
+    padding: 7px 8px;
+    text-align: center;
+    border-bottom: 1px solid rgba(31,37,48,0.5);
+  }
+
+  .migration-table .row-label {
+    text-align: left;
+    color: var(--text2);
+    font-weight: 500;
+  }
+
+  .migration-table tr:last-child td { border-bottom: none; }
+
+  /* PARAMETER SLIDERS */
+  .param-list { display: flex; flex-direction: column; gap: 16px; margin-top: 4px; }
+
+  .param-row { display: flex; flex-direction: column; gap: 6px; }
+
+  .param-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+
+  .param-name {
+    font-size: 12px;
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .param-value {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent);
+  }
+
+  .param-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border);
+    outline: none;
+    cursor: pointer;
+  }
+
+  .param-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: 2px solid var(--bg);
+  }
+
+  .param-slider::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: 2px solid var(--bg);
+  }
+
+  .param-range {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text3);
+  }
+
+  /* RULE COMPLIANCE */
+  .rule-list { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+
+  .rule-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: var(--surface2);
+    border-radius: 3px;
+    border: 1px solid var(--border);
+  }
+
+  .rule-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+
+  .rule-pass { background: rgba(75,232,138,0.1); color: var(--ok); }
+  .rule-warn { background: rgba(232,145,75,0.1); color: var(--warn); }
+  .rule-fail { background: rgba(232,91,75,0.1); color: var(--danger); }
+
+  .rule-info { flex: 1; }
+  .rule-name { font-size: 12px; font-weight: 500; color: var(--text); }
+  .rule-desc { font-size: 11px; color: var(--text3); margin-top: 2px; }
+
+  .rule-val {
+    font-family: var(--mono);
+    font-size: 12px;
+    text-align: right;
+  }
+
+  /* ACTION BUTTONS */
+  .action-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+    grid-column: span 3;
+    justify-content: flex-end;
+  }
+
+  .btn {
+    padding: 9px 18px;
+    border-radius: 3px;
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    letter-spacing: 0.03em;
+    border: 1px solid transparent;
+    transition: all 0.15s;
+  }
+
+  .btn-ghost {
+    background: transparent;
+    border-color: var(--border);
+    color: var(--text2);
+  }
+
+  .btn-ghost:hover { border-color: var(--text3); color: var(--text); }
+
+  .btn-primary {
+    background: var(--accent);
+    color: var(--bg);
+    border-color: var(--accent);
+  }
+
+  .btn-primary:hover { background: #f0c660; }
+
+  .btn-danger {
+    background: transparent;
+    border-color: var(--danger);
+    color: var(--danger);
+  }
+
+  .btn-danger:hover { background: rgba(232,91,75,0.1); }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* DIVIDERS */
+  .divider {
+    width: 100%;
+    height: 1px;
+    background: var(--border);
+    margin: 12px 0;
+  }
+
+  .section-header {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: var(--text3);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .section-header::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* TOOLTIP */
+  .tooltip-tag {
+    font-family: var(--mono);
+    font-size: 9px;
+    padding: 2px 6px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    color: var(--text3);
+    margin-left: 8px;
+    letter-spacing: 0.05em;
+  }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-left">
+    <span class="logo-badge">BCST</span>
+    <span class="topbar-title">Wholesale Credit Risk — Stress Testing & Exercise Platform</span>
+  </div>
+  <div class="topbar-right">
+    <div class="status-pill">
+      <span class="status-dot"></span>
+      Live Data Feed
+    </div>
+    <span class="topbar-date" id="live-date"></span>
+  </div>
+</div>
+
+<!-- SCENARIO TABS -->
+<div class="scenario-bar">
+  <button class="scenario-tab active" onclick="switchScenario(this, 'base')">
+    Baseline <span class="severity sev-mild">MILD</span>
+  </button>
+  <button class="scenario-tab" onclick="switchScenario(this, 'adverse')">
+    Adverse <span class="severity sev-moderate">MODERATE</span>
+  </button>
+  <button class="scenario-tab" onclick="switchScenario(this, 'severe')">
+    Severely Adverse <span class="severity sev-severe">SEVERE</span>
+  </button>
+  <button class="scenario-tab" onclick="switchScenario(this, 'custom')">
+    Custom Scenario <span class="severity" style="background:rgba(75,173,232,0.15);color:var(--accent2)">USER</span>
+  </button>
+  <button class="scenario-tab" onclick="switchScenario(this, 'reverse')">
+    Reverse Stress <span class="severity sev-severe">EXTREME</span>
+  </button>
+</div>
+
+<!-- MAIN GRID -->
+<div class="main" id="main-grid">
+
+  <!-- KPI METRICS -->
+  <div class="kpi-grid">
+    <div class="kpi-card k1" style="animation-delay:0.05s">
+      <div class="kpi-label">Expected Credit Loss</div>
+      <div class="kpi-value red" id="kpi-ecl">₹ 4,832 Cr</div>
+      <div class="kpi-sub">Stress EL <span class="kpi-delta delta-up" id="kpi-ecl-d">▲ +38.4%</span></div>
+    </div>
+    <div class="kpi-card k2" style="animation-delay:0.1s">
+      <div class="kpi-label">Stressed PD (Portfolio Avg)</div>
+      <div class="kpi-value orange" id="kpi-pd">3.82%</div>
+      <div class="kpi-sub">vs Baseline 1.24% <span class="kpi-delta delta-up" id="kpi-pd-d">▲ +2.58pp</span></div>
+    </div>
+    <div class="kpi-card k3" style="animation-delay:0.15s">
+      <div class="kpi-label">Capital Requirement (RWA)</div>
+      <div class="kpi-value blue" id="kpi-rwa">₹ 1,18,460 Cr</div>
+      <div class="kpi-sub">CET1 Impact <span class="kpi-delta delta-up" id="kpi-cet1">▲ –224 bps</span></div>
+    </div>
+    <div class="kpi-card k4" style="animation-delay:0.2s">
+      <div class="kpi-label">Breached Concentration Limits</div>
+      <div class="kpi-value gold" id="kpi-breach">3 / 18</div>
+      <div class="kpi-sub">BCST §4.3 Large Exposure <span class="kpi-delta delta-up">▲ +2</span></div>
+    </div>
+  </div>
+
+  <!-- EXPOSURE BREAKDOWN TABLE -->
+  <div class="card span-2 blue-top" style="animation-delay:0.22s">
+    <div class="card-label">Wholesale Credit Portfolio — Sector Exposure</div>
+    <table class="exposure-table">
+      <thead>
+        <tr>
+          <th>Sector</th>
+          <th>EAD (₹ Cr)</th>
+          <th>Rating</th>
+          <th>Stressed PD</th>
+          <th>LGD</th>
+          <th>EL (₹ Cr)</th>
+          <th style="min-width:90px">Conc. %</th>
+        </tr>
+      </thead>
+      <tbody id="exposure-tbody">
+      </tbody>
+    </table>
+  </div>
+
+  <!-- BCST RULE COMPLIANCE -->
+  <div class="card accent-top" style="animation-delay:0.26s">
+    <div class="card-label">BCST Rule Compliance — Current Scenario</div>
+    <div class="rule-list" id="rule-list"></div>
+  </div>
+
+  <!-- WATERFALL — PD SHOCK DECOMPOSITION -->
+  <div class="card" style="animation-delay:0.3s">
+    <div class="card-label">PD Shock Decomposition</div>
+    <div class="card-title">Baseline → Stressed PD Attribution</div>
+    <div class="waterfall-wrap" id="waterfall"></div>
+  </div>
+
+  <!-- HEATMAP — SECTOR × RATING -->
+  <div class="card" style="animation-delay:0.34s">
+    <div class="card-label">Stressed EL Heatmap — Sector × Rating Bucket</div>
+    <div class="heatmap-grid" id="heatmap"></div>
+  </div>
+
+  <!-- PD MIGRATION MATRIX -->
+  <div class="card span-2" style="animation-delay:0.38s">
+    <div class="card-label">PD Migration Matrix — Stressed Transition (1Y)</div>
+    <table class="migration-table" id="migration-table"></table>
+  </div>
+
+  <!-- STRESS PARAMETERS (sliders) -->
+  <div class="card" style="animation-delay:0.42s">
+    <div class="card-label">Macroeconomic Stress Parameters</div>
+    <div class="param-list" id="param-list"></div>
+  </div>
+
+  <!-- ACTIONS -->
+  <div class="action-row">
+    <button class="btn btn-ghost">Export Report (PDF)</button>
+    <button class="btn btn-ghost">Save Scenario</button>
+    <button class="btn btn-danger">Flag for Review</button>
+    <button class="btn btn-primary" onclick="runStress()">▶ Run Stress Exercise</button>
+  </div>
+
+</div>
+
+<script>
+// ─── DATA DEFINITIONS ─────────────────────────────────────────────────────────
+
+const scenarios = {
+  base:    { label: 'Baseline',         pdMult: 1.0,  lgdMult: 1.0,  ecl: 3490,  pd: 1.24, rwa: 89200, breach: 1, cet1: '–82 bps',   gdpShock: -0.5, cdsWide: 40,  npaMov: 15, rate: 0.5 },
+  adverse: { label: 'Adverse',          pdMult: 2.1,  lgdMult: 1.18, ecl: 4832,  pd: 3.82, rwa: 118460, breach: 3, cet1: '–224 bps', gdpShock: -2.8, cdsWide: 180, npaMov: 42, rate: 1.8 },
+  severe:  { label: 'Severely Adverse', pdMult: 3.6,  lgdMult: 1.38, ecl: 7920,  pd: 6.11, rwa: 152800, breach: 7, cet1: '–418 bps', gdpShock: -5.8, cdsWide: 420, npaMov: 78, rate: 3.5 },
+  custom:  { label: 'Custom',           pdMult: 2.7,  lgdMult: 1.25, ecl: 5940,  pd: 4.65, rwa: 130200, breach: 5, cet1: '–310 bps', gdpShock: -4.0, cdsWide: 260, npaMov: 58, rate: 2.6 },
+  reverse: { label: 'Reverse Stress',   pdMult: 6.2,  lgdMult: 1.65, ecl: 13800, pd: 10.4, rwa: 198000, breach: 11, cet1: '–740 bps', gdpShock: -9.5, cdsWide: 800, npaMov: 140, rate: 6.5 }
+};
+
+let activeScenario = 'adverse';
+
+const sectors = [
+  { name: 'Infrastructure',       ead: 28400, rating: 'BBB', pd: 2.9,  lgd: 44, color: '#4bade8' },
+  { name: 'Real Estate / NBFC',   ead: 22100, rating: 'BB',  pd: 5.8,  lgd: 52, color: '#e8914b' },
+  { name: 'Steel & Metals',       ead: 18700, rating: 'A',   pd: 2.1,  lgd: 38, color: '#4be88a' },
+  { name: 'Power & Energy',       ead: 17200, rating: 'BBB', pd: 3.4,  lgd: 46, color: '#4bade8' },
+  { name: 'Textiles',             ead: 12400, rating: 'B',   pd: 8.2,  lgd: 58, color: '#e85b4b' },
+  { name: 'Telecom',              ead: 11800, rating: 'BBB', pd: 3.1,  lgd: 42, color: '#4bade8' },
+  { name: 'Chemicals / Pharma',   ead: 9600,  rating: 'AA',  pd: 0.9,  lgd: 32, color: '#4be88a' },
+  { name: 'Auto / Ancillaries',   ead: 8200,  rating: 'A',   pd: 1.8,  lgd: 36, color: '#4be88a' },
+  { name: 'Agri & Food Proc.',    ead: 7100,  rating: 'BB',  pd: 4.5,  lgd: 48, color: '#e8914b' },
+];
+
+const totalEAD = sectors.reduce((s,x)=>s+x.ead,0);
+
+const bcstRules = [
+  { code: 'BCST §3.1', name: 'Minimum Stress Coverage', desc: 'Scenarios must cover ≥3 severity levels', status: 'pass', value: '5/5 covered' },
+  { code: 'BCST §4.3', name: 'Single Counterparty Limit', desc: 'No single exposure >15% of Tier-1 Capital', status: 'warn', value: '14.2% (warn)' },
+  { code: 'BCST §4.5', name: 'Sector Concentration Cap', desc: 'NBFC/RE sector ≤20% total wholesale book', status: 'fail', value: '22.1% ❌' },
+  { code: 'BCST §5.2', name: 'PD Floor (Stressed)',      desc: 'Stressed PD floor: Investment Grade ≥0.5%', status: 'pass', value: 'Compliant' },
+  { code: 'BCST §6.1', name: 'LGD Haircut Floor',        desc: 'Collateral haircut ≥20% under adverse', status: 'pass', value: 'Applied 28%' },
+  { code: 'BCST §7.2', name: 'Capital Adequacy Buffer',  desc: 'Post-stress CET1 ≥7.5%', status: 'warn', value: '8.14% (low)' },
+];
+
+const wfBars = [
+  { label: 'Baseline PD', val: 1.24, color: '#4bade8',  neg: false },
+  { label: 'GDP Shock',   val: 1.12, color: '#e85b4b',  neg: false },
+  { label: 'CDS Widening',val: 0.62, color: '#e8914b',  neg: false },
+  { label: 'NPA Contagion',val: 0.54, color: '#e8914b',  neg: false },
+  { label: 'Rate Shock',  val: 0.30, color: '#e8914b',  neg: false },
+  { label: 'Stressed PD', val: 3.82, color: '#e84b6a',  neg: false },
+];
+
+const ratings = ['AAA', 'AA', 'A', 'BBB', 'BB', 'B'];
+const heatSectors = ['Infra', 'RE/NBFC', 'Steel', 'Power', 'Textile', 'Auto'];
+const heatData = [
+  [2, 4, 8, 14, 32, 48],
+  [5, 10, 18, 32, 72, 112],
+  [1, 3, 6, 11, 24, 38],
+  [3, 6, 12, 22, 48, 74],
+  [8, 15, 26, 44, 92, 148],
+  [1, 2, 4, 8, 18, 28],
+];
+
+const migRatings = ['AAA','AA','A','BBB','BB','B','Default'];
+const migMatrix = [
+  [88.2, 7.1, 2.8, 1.2, 0.4, 0.2, 0.1],
+  [0.9, 84.6, 8.4, 3.8, 1.5, 0.5, 0.3],
+  [0.2, 2.4, 80.1, 11.2, 4.2, 1.4, 0.5],
+  [0.1, 0.4, 4.8, 74.2, 12.6, 5.8, 2.1],
+  [0.0, 0.1, 0.8, 7.2, 68.4, 16.2, 7.3],
+  [0.0, 0.1, 0.2, 1.4, 9.8, 62.1, 26.4],
+];
+
+const params = [
+  { name: 'GDP Growth Shock', key: 'gdpShock', unit: '%', min: -12, max: 0, step: 0.1 },
+  { name: 'CDS Spread Widening', key: 'cdsWide', unit: 'bps', min: 0, max: 1000, step: 5 },
+  { name: 'NPA Movement', key: 'npaMov', unit: 'bps', min: 0, max: 200, step: 2 },
+  { name: 'Interest Rate Shock', key: 'rate', unit: '%', min: 0, max: 8, step: 0.1 },
+];
+
+// ─── RENDER FUNCTIONS ─────────────────────────────────────────────────────────
+
+function ratingClass(r) {
+  const map = { AAA: 'r-aaa', AA: 'r-aa', A: 'r-a', BBB: 'r-bbb', BB: 'r-bb', B: 'r-b' };
+  return map[r] || 'r-bbb';
+}
+
+function formatINR(n) {
+  return '₹ ' + n.toLocaleString('en-IN') + ' Cr';
+}
+
+function renderExposure(sc) {
+  const m = scenarios[sc].pdMult;
+  const lm = scenarios[sc].lgdMult;
+  const tbody = document.getElementById('exposure-tbody');
+  tbody.innerHTML = sectors.map(s => {
+    const pd = Math.min(s.pd * m, 40).toFixed(2);
+    const lgd = Math.min(s.lgd * lm, 80).toFixed(0);
+    const el = Math.round(s.ead * (+pd/100) * (+lgd/100));
+    const conc = ((s.ead/totalEAD)*100).toFixed(1);
+    const barW = Math.min((s.ead/28400)*100, 100).toFixed(0);
+    const barColor = s.color;
+    return `
+      <tr>
+        <td>${s.name}</td>
+        <td>${s.ead.toLocaleString('en-IN')}</td>
+        <td><span class="rating-badge ${ratingClass(s.rating)}">${s.rating}</span></td>
+        <td style="color:${+pd>5?'var(--danger)':+pd>3?'var(--warn)':'var(--text)'}">${pd}%</td>
+        <td>${lgd}%</td>
+        <td style="color:var(--warn)">${el.toLocaleString('en-IN')}</td>
+        <td class="bar-cell">
+          ${conc}%
+          <div class="mini-bar"><div class="mini-bar-fill" style="width:${barW}%;background:${barColor}"></div></div>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+function renderRules(sc) {
+  const rules = [...bcstRules];
+  const s = scenarios[sc];
+  rules[1].status = s.breach >= 5 ? 'fail' : s.breach >= 2 ? 'warn' : 'pass';
+  rules[1].value = s.breach >= 5 ? 'BREACH ❌' : s.breach >= 2 ? '14.2% (warn)' : 'Compliant';
+  rules[5].status = s.pd > 6 ? 'fail' : s.pd > 4 ? 'warn' : 'pass';
+  rules[5].value = s.pd > 6 ? `${(7.5 - (s.cet1||0)).toFixed(1)}% ❌` : s.pd > 4 ? '8.14% (low)' : 'Compliant';
+
+  const iconMap = { pass: '✓', warn: '!', fail: '✕' };
+  document.getElementById('rule-list').innerHTML = rules.map(r => `
+    <div class="rule-item">
+      <div class="rule-icon rule-${r.status}">${iconMap[r.status]}</div>
+      <div class="rule-info">
+        <div class="rule-name">${r.name} <span class="tooltip-tag">${r.code}</span></div>
+        <div class="rule-desc">${r.desc}</div>
+      </div>
+      <div class="rule-val" style="color:${r.status==='pass'?'var(--ok)':r.status==='warn'?'var(--warn)':'var(--danger)'}">${r.value}</div>
+    </div>`).join('');
+}
+
+function renderWaterfall(sc) {
+  const s = scenarios[sc];
+  const pdBars = [
+    { label: 'Baseline PD', val: 1.24, color: '#4bade8' },
+    { label: 'GDP Shock',   val: +(s.gdpShock * -0.38).toFixed(2), color: '#e85b4b' },
+    { label: 'CDS Widen',   val: +(s.cdsWide * 0.0032).toFixed(2), color: '#e8914b' },
+    { label: 'NPA Effect',  val: +(s.npaMov * 0.0048).toFixed(2),  color: '#e8914b' },
+    { label: 'Rate Shock',  val: +(s.rate * 0.16).toFixed(2),      color: '#e8b84b' },
+    { label: 'Stressed PD', val: s.pd, color: '#e84b6a' },
+  ];
+  const maxVal = Math.max(...pdBars.map(b=>b.val));
+  const maxH = 110;
+  document.getElementById('waterfall').innerHTML = pdBars.map((b,i) => {
+    const h = Math.max((b.val / maxVal) * maxH, 4).toFixed(1);
+    const isTotal = i === 0 || i === pdBars.length - 1;
+    return `
+      <div class="wf-bar-group">
+        <div class="wf-bar" style="height:${h}px;background:${isTotal?b.color:b.color+'bb'};">
+          <span class="wf-bar-val">${b.val.toFixed(2)}%</span>
+        </div>
+        <span class="wf-bar-label">${b.label}</span>
+      </div>`;
+  }).join('');
+}
+
+function renderHeatmap() {
+  const maxVal = Math.max(...heatData.flat());
+  let html = '<div></div>' + ratings.map(r => `<div class="hm-col-label">${r}</div>`).join('');
+  heatSectors.forEach((sec, si) => {
+    html += `<div class="hm-row-label">${sec}</div>`;
+    ratings.forEach((_, ri) => {
+      const v = heatData[si][ri];
+      const intensity = v / maxVal;
+      const r = Math.round(232 * intensity + 17 * (1-intensity));
+      const g = Math.round(75 * (1-intensity) + 25 * intensity);
+      const b = Math.round(75 * (1-intensity) + 36 * intensity);
+      const textColor = intensity > 0.4 ? '#fff' : 'var(--text3)';
+      html += `<div class="hm-cell" style="background:rgb(${r},${g},${b});color:${textColor}" title="${sec} / ${ratings[ri]}: ${v} Cr">${v}</div>`;
+    });
+  });
+  document.getElementById('heatmap').innerHTML = html;
+}
+
+function renderMigration(sc) {
+  const m = scenarios[sc].pdMult;
+  let html = `<thead><tr><th>From \ To</th>${migRatings.map(r=>`<th>${r}</th>`).join('')}</tr></thead><tbody>`;
+  migMatrix.forEach((row, ri) => {
+    html += `<tr><td class="row-label">${migRatings[ri]}</td>`;
+    row.forEach((v, ci) => {
+      const stressed = ri === ci ? Math.max(v - (m-1)*8, 30).toFixed(1)
+                     : ci === migRatings.length-1 ? Math.min(v * m, 45).toFixed(1)
+                     : v.toFixed(1);
+      const isDiag = ri === ci;
+      const isDefault = ci === migRatings.length - 1;
+      const color = isDiag ? 'var(--ok)' : isDefault ? 'var(--danger)' : ci < ri ? 'var(--warn)' : 'var(--text3)';
+      const bg = isDiag ? 'rgba(75,232,138,0.06)' : isDefault && ri < 4 ? 'rgba(232,91,75,0.04)' : 'transparent';
+      html += `<td style="color:${color};background:${bg}">${stressed}%</td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody>';
+  document.getElementById('migration-table').innerHTML = html;
+}
+
+function renderParams(sc) {
+  const s = scenarios[sc];
+  document.getElementById('param-list').innerHTML = params.map(p => {
+    const val = s[p.key];
+    const pct = ((val - p.min) / (p.max - p.min) * 100).toFixed(0);
+    return `
+      <div class="param-row">
+        <div class="param-top">
+          <span class="param-name">${p.name}</span>
+          <span class="param-value">${val > 0 && p.unit !== 'bps' ? '+' : ''}${val} ${p.unit}</span>
+        </div>
+        <input type="range" class="param-slider" min="${p.min}" max="${p.max}" step="${p.step}" value="${val}"
+          oninput="updateParam('${p.key}', this.value, this.parentElement.querySelector('.param-value'), '${p.unit}')">
+        <div class="param-range"><span>${p.min}${p.unit}</span><span>${p.max}${p.unit}</span></div>
+      </div>`;
+  }).join('');
+}
+
+function updateKPIs(sc) {
+  const s = scenarios[sc];
+  const prev = scenarios['base'];
+  const delta = (((s.ecl - prev.ecl) / prev.ecl) * 100).toFixed(1);
+  document.getElementById('kpi-ecl').textContent = `₹ ${s.ecl.toLocaleString('en-IN')} Cr`;
+  document.getElementById('kpi-ecl-d').textContent = `▲ +${delta}%`;
+  document.getElementById('kpi-pd').textContent = `${s.pd}%`;
+  document.getElementById('kpi-pd-d').textContent = `▲ +${(s.pd - 1.24).toFixed(2)}pp`;
+  document.getElementById('kpi-rwa').textContent = `₹ ${s.rwa.toLocaleString('en-IN')} Cr`;
+  document.getElementById('kpi-cet1').textContent = `▲ ${s.cet1}`;
+  document.getElementById('kpi-breach').textContent = `${s.breach} / 18`;
+}
+
+function renderAll(sc) {
+  updateKPIs(sc);
+  renderExposure(sc);
+  renderRules(sc);
+  renderWaterfall(sc);
+  renderHeatmap();
+  renderMigration(sc);
+  renderParams(sc);
+}
+
+function switchScenario(el, sc) {
+  document.querySelectorAll('.scenario-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  activeScenario = sc;
+  renderAll(sc);
+}
+
+function updateParam(key, val, labelEl, unit) {
+  scenarios[activeScenario][key] = +val;
+  labelEl.textContent = `${+val > 0 && unit !== 'bps' ? '+' : ''}${val} ${unit}`;
+  renderAll(activeScenario);
+}
+
+function runStress() {
+  const btn = document.querySelector('.btn-primary');
+  btn.textContent = '⟳ Running...';
+  btn.disabled = true;
+  setTimeout(() => {
+    btn.textContent = '✓ Exercise Complete';
+    btn.style.background = 'var(--ok)';
+    setTimeout(() => {
+      btn.textContent = '▶ Run Stress Exercise';
+      btn.style.background = '';
+      btn.disabled = false;
+    }, 2500);
+  }, 1400);
+}
+
+// Live date
+function updateDate() {
+  document.getElementById('live-date').textContent = new Date().toLocaleString('en-IN', {
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit'
+  });
+}
+
+updateDate();
+setInterval(updateDate, 1000);
+renderAll('adverse');
+</script>
+</body>
+</html>
